@@ -1,0 +1,10 @@
+[package]
+name = "aitios-asset"
+version = "0.1.0"
+authors = ["krachzack <hello@phstadler.com>"]
+
+[dependencies]
+aitios-geom = { git = "https://github.com/krachzack/aitios-geom.git" }
+aitios-scene = { git = "https://github.com/krachzack/aitios-scene.git" }
+tobj = "0.1.6"
+pathdiff = "0.1.0"
