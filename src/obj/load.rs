@@ -42,7 +42,7 @@ fn convert_models<I>(models: I, materials: &Vec<Rc<Material>>) -> Vec<Entity>
         .collect()
 }
 
-fn tobj_mesh_to_aitios_mesh(mesh: tobj::Mesh) -> DeinterleavedIndexedMeshBuf {
+fn tobj_mesh_to_aitios_mesh(mesh: tobj::Mesh) -> Rc<DeinterleavedIndexedMeshBuf> {
     let tobj::Mesh {
         positions,
         normals,
@@ -66,9 +66,11 @@ fn tobj_mesh_to_aitios_mesh(mesh: tobj::Mesh) -> DeinterleavedIndexedMeshBuf {
         texcoords.extend(zero_texcoords);
     }
 
-    DeinterleavedIndexedMeshBuf {
-        positions, normals, texcoords, indices
-    }
+    Rc::new(
+        DeinterleavedIndexedMeshBuf {
+            positions, normals, texcoords, indices
+        }
+    )
 }
 
 fn convert_materials<I>(materials: I) -> Vec<Rc<Material>>
