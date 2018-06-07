@@ -4,7 +4,7 @@ use aitios_asset::obj;
 
 #[test]
 fn inout_test() {
-    let entities = obj::load("tests/cube.obj")
+    let mut entities = obj::load("tests/cube.obj")
         .unwrap();
 
     obj::save(
@@ -20,8 +20,20 @@ fn inout_test() {
     ).unwrap();
 
     obj::save(
+        entities.iter_mut(),
+        Some("tests/cube_without_mtl.obj"),
+        None
+    ).unwrap();
+
+    obj::save(
         entities.iter(),
         None,
         Some("tests/cube_without_obj.mtl")
+    ).unwrap();
+
+    obj::save(
+        entities.into_iter(),
+        Some("tests/cube_without_mtl.obj"),
+        None
     ).unwrap();
 }
