@@ -202,6 +202,7 @@ mod test {
     use super::*;
     use obj::load;
     use std::rc::Rc;
+    use std::fs::remove_file;
 
     #[test]
     fn test_material_name_collision_resolution() {
@@ -231,8 +232,8 @@ mod test {
             ..cube.clone()
         };
 
-        let obj_path = "/tmp/aitios-test-obj-export.obj";
-        let mtl_path = "/tmp/aitios-test-obj-export.mtl";
+        let obj_path = "aitios-test-obj-export.obj";
+        let mtl_path = "aitios-test-obj-export.mtl";
 
         save(
             vec![cube, &cube_clone, &cube_roughness, &cube_normal],
@@ -265,5 +266,8 @@ mod test {
             loaded.iter().filter(|e| e.material.name() == "Material-Cube-3").count(),
             "Expecting two entities with material Material"
         );
+
+        remove_file(obj_path).expect("Could not remove obj file created for test");
+        remove_file(mtl_path).expect("Could not remove obj file created for test");
     }
 }
