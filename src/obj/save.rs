@@ -1,11 +1,10 @@
 
-use scene::Entity;
+use scene::{Entity, MaterialBuilder};
 use std::path::PathBuf;
 use std::fs::{File, canonicalize};
 use std::io::Write;
 use err::{Error, Result};
 use pathdiff::diff_paths;
-use std::collections::HashSet;
 use std::borrow::Borrow;
 
 /// Exports the given iterator over entities (or references, boxes, etc.) to the given OBJ/MTL files.
@@ -20,7 +19,7 @@ pub fn save<I, E, P>(entities: I, obj_output_path: Option<P>, mtl_output_path: O
     let obj_output_path = obj_output_path.map(|p| p.into());
     let mtl_output_path = mtl_output_path.map(|p| p.into());
     let mut mtl_file = None;
-    let mut persisted_materials = HashSet::new();
+    let mut persisted_materials = Vec::new();
 
     if let Some(ref mtl_output_path) = mtl_output_path {
         let mut mtl = File::create(&mtl_output_path)?;
@@ -69,6 +68,30 @@ pub fn save<I, E, P>(entities: I, obj_output_path: Option<P>, mtl_output_path: O
         for entity in entities.into_iter() {
             let entity = entity.borrow();
 
+            let material = if persisted_materials.contains(&*entity.material) {
+                // An exact same material with same maps can be shared,
+                // no need for duplication
+                (*entity.material).clone()
+            } else if persisted_materials.iter().any(|m| m.name() == entity.material.name()) {
+                // On a collision, where the name is the same but the maps are different,
+                // make the name unique by appending the entity name
+                // If that is not enough for uniqueness, try adding a numeric suffix until
+                // the name is finally unique.
+                // e.g. iron => iron-bunny => iron-bunny-2 => iron-bunny-3
+                let unique_name_base = format!("{}-{}", entity.material.name(), entity.name);
+                let mut unique_name = unique_name_base.clone();
+                let mut suffix = 1;
+                while persisted_materials.iter().any(|m| m.name() == &unique_name) {
+                    suffix += 1; // start at two, since 1 is the one without suffix
+                    unique_name = format!("{}-{}", unique_name_base, suffix);
+                }
+                MaterialBuilder::from(&*entity.material)
+                    .name(unique_name)
+                    .build()
+            } else {
+                (*entity.material).clone()
+            };
+
             obj.write("o ".as_bytes())?;
             obj.write(entity.name.as_bytes())?;
             obj.write("\n".as_bytes())?;
@@ -95,7 +118,7 @@ pub fn save<I, E, P>(entities: I, obj_output_path: Option<P>, mtl_output_path: O
             }
 
             if mtl_lib.is_some() {
-                obj.write(format!("usemtl {}\n", entity.material.name()).as_bytes())?;
+                obj.write(format!("usemtl {}\n", material.name()).as_bytes())?;
             }
 
             {
@@ -143,11 +166,9 @@ pub fn save<I, E, P>(entities: I, obj_output_path: Option<P>, mtl_output_path: O
             normals_idx_base += entity.mesh.normals.len() / 3;
 
             if let Some(ref mut mtl) = mtl_file {
-                let material_name = entity.material.name();
-                let mtl_maps = entity.material.maps();
-
-                if persisted_materials.insert(material_name.clone()) {
-                    mtl.write(format!("\nnewmtl {}\n", material_name).as_bytes())?;
+                if !persisted_materials.contains(&material) {
+                    let mtl_maps = material.maps();
+                    mtl.write(format!("\nnewmtl {}\n", material.name()).as_bytes())?;
                     //mtl.write(format!("Ns {}\n", material.shininess).as_bytes())?;
                     //mtl.write(format!("Ka {} {} {}\n", material.ambient[0], material.ambient[1], material.ambient[2]).as_bytes())?;
                     //mtl.write(format!("Kd {} {} {}\n", material.diffuse[0], material.diffuse[1], material.diffuse[2]).as_bytes())?;
@@ -168,8 +189,81 @@ pub fn save<I, E, P>(entities: I, obj_output_path: Option<P>, mtl_output_path: O
                     }
                 }
             }
+
+            persisted_materials.push(material);
         }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use obj::load;
+    use std::rc::Rc;
+
+    #[test]
+    fn test_material_name_collision_resolution() {
+        let scene = load("tests/cube.obj")
+            .unwrap();
+
+        let cube = &scene[0];
+
+        // Exact same material, name will not be duplicated and material shared
+        let cube_clone = cube.clone();
+
+        // Different roughness map, will receive entity name suffix
+        let cube_roughness = Entity {
+            material: Rc::new(MaterialBuilder::from(&*cube.material)
+                // Using current directory as image file, otherwise saving would file since it
+                // cannot find the map and thus cannot build a relative path
+                .roughness_map(".")
+                .build()),
+            ..cube.clone()
+        };
+
+        // Different roughness map, will receive entity name suffix
+        let cube_normal = Entity {
+            material: Rc::new(MaterialBuilder::from(&*cube.material)
+                .normal_map(".")
+                .build()),
+            ..cube.clone()
+        };
+
+        let obj_path = "/tmp/aitios-test-obj-export.obj";
+        let mtl_path = "/tmp/aitios-test-obj-export.mtl";
+
+        save(
+            vec![cube, &cube_clone, &cube_roughness, &cube_normal],
+            Some(obj_path), Some(mtl_path)
+        ).unwrap();
+
+        let loaded = load("/tmp/aitios-test-obj-export.obj")
+            .unwrap();
+
+        assert_eq!(
+            2,
+            loaded.iter().filter(|e| e.material.name() == "Material").count(),
+            "Expecting two entities with material Material"
+        );
+
+        assert_eq!(
+            1,
+            loaded.iter().filter(|e| e.material.name() == "Material-Cube").count(),
+            "Expecting two entities with material Material"
+        );
+
+        assert_eq!(
+            1,
+            loaded.iter().filter(|e| e.material.name() == "Material-Cube-2").count(),
+            "Expecting two entities with material Material"
+        );
+
+        assert_eq!(
+            0,
+            loaded.iter().filter(|e| e.material.name() == "Material-Cube-3").count(),
+            "Expecting two entities with material Material"
+        );
+    }
 }
