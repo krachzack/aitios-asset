@@ -89,12 +89,85 @@ fn tobj_to_aitios_mat(source_mat: tobj::Material) -> Rc<Material> {
         mat = mat.diffuse_color_map(source_mat.diffuse_texture);
     }
 
+    if !source_mat.ambient_texture.is_empty() {
+        mat = mat.ambient_color_map(source_mat.ambient_texture);
+    }
+
     if !source_mat.specular_texture.is_empty() {
         mat = mat.specular_color_map(source_mat.specular_texture);
     }
 
-    if !source_mat.ambient_texture.is_empty() {
-        mat = mat.ambient_color_map(source_mat.ambient_texture);
+    let other = &source_mat.unknown_param;
+    let bump = other.get("bump") // official name
+        .or_else(|| other.get("map_bump")) // also seen this
+        .or_else(|| other.get("bump_map")); // this one is just silly
+
+    if let Some(bump) = bump {
+        mat = mat.bump_map(bump);
+    }
+
+    let displacement = other.get("disp") // official name
+        .or_else(|| other.get("map_disp")) // maybe some people also use this?
+        .or_else(|| other.get("disp_map"));
+
+    // While bump and displacement are standardized,
+    // what follows isnt
+
+    if let Some(displacement) = displacement {
+        mat = mat.displacement_map(displacement);
+    }
+
+    // There is a built-in source_math.normal_texture in tobj.
+    // However, it falsely uses map_Ns
+    // Hence, use the unknown "norm", which is recommended for normals
+    let normal = other.get("norm") // official, inofficial name
+        .or_else(|| other.get("map_norm")) // maybe some people also use this?
+        .or_else(|| other.get("map_normal"))
+        .or_else(|| other.get("normal"))
+        .or_else(|| other.get("normal_map"));
+
+    if let Some(normal) = normal {
+        mat = mat.normal_map(normal);
+    }
+
+    let roughness = other.get("map_Pr") // official, inofficial name
+        .or_else(|| other.get("map_PR")) // maybe some people also use this?
+        .or_else(|| other.get("map_pr"))
+        .or_else(|| other.get("map_pR"))
+        .or_else(|| other.get("Pr_map"));
+
+    if let Some(roughness) = roughness {
+        mat = mat.roughness_map(roughness);
+    }
+
+    let metallic = other.get("map_Pm") // official, inofficial name
+        .or_else(|| other.get("map_PM")) // maybe some people also use this?
+        .or_else(|| other.get("map_pm"))
+        .or_else(|| other.get("map_pM"))
+        .or_else(|| other.get("Pm_map"));
+
+    if let Some(metallic) = metallic {
+        mat = mat.metallic_map(metallic);
+    }
+
+    let sheen = other.get("map_Ps") // official, inofficial name
+        .or_else(|| other.get("map_PS")) // maybe some people also use this?
+        .or_else(|| other.get("map_ps"))
+        .or_else(|| other.get("map_pS"))
+        .or_else(|| other.get("Ps_map"));
+
+    if let Some(sheen) = sheen {
+        mat = mat.sheen_map(sheen);
+    }
+
+    let emissive = other.get("map_Ke") // official, inofficial name
+        .or_else(|| other.get("map_KE")) // maybe some people also use this?
+        .or_else(|| other.get("map_ke"))
+        .or_else(|| other.get("map_kE"))
+        .or_else(|| other.get("Ke_map"));
+
+    if let Some(emissive) = emissive {
+        mat = mat.emissive_map(emissive);
     }
 
     Rc::new(mat.build())
