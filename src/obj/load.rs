@@ -3,10 +3,11 @@ use tobj;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::iter::repeat;
+use err::Result;
 
 /// Loads the entities stored in the OBJ file at the given path, also loading
 /// associated materials from the MTL file referenced in the OBJ.
-pub fn load<P : Into<PathBuf>>(from : P) -> Result<Vec<Entity>, tobj::LoadError> {
+pub fn load<P : Into<PathBuf>>(from : P) -> Result<Vec<Entity>> {
     let (models, materials) = tobj::load_obj(&from.into())?;
 
     let materials = convert_materials(materials);

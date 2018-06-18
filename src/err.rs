@@ -1,41 +1,27 @@
-use std::fmt;
-use std::error;
 use std::result;
 use std::io;
+use tobj;
 
-pub type Result<T> = result::Result<T, Error>;
+pub type Result<T> = result::Result<T, AssetError>;
 
-#[derive(Debug)]
-pub enum Error {
-    IO(io::Error),
-    Other(String)
+#[derive(Debug, Fail)]
+pub enum AssetError {
+    #[fail(display = "Asset import encountered error")]
+    Load(#[cause] tobj::LoadError),
+    #[fail(display = "Asset export encountered IO error")]
+    Save(#[cause] io::Error),
+    #[fail(display = "Invalid data during asset import/export: ")]
+    InvalidData(String)
 }
 
-/*impl Error {
-    fn other(message: &str) -> Self {
-        Error::Other(String::from(message))
-    }
-}*/
-
-impl error::Error for Error {
-    fn description<'a>(&'a self) -> &'a str {
-        /*match self {
-            &Error::IO(err) => err.description(),
-            &Error::Other(string) => &string
-        }*/
-        "Import/Export error"
+impl From<tobj::LoadError> for AssetError {
+    fn from(err: tobj::LoadError) -> AssetError {
+        AssetError::Load(err)
     }
 }
 
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Error {
-        Error::IO(err)
+impl From<io::Error> for AssetError {
+    fn from(err: io::Error) -> AssetError {
+        AssetError::Save(err)
     }
 }
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-

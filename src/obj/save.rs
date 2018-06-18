@@ -1,9 +1,8 @@
-
 use scene::{Entity, MaterialBuilder};
 use std::path::PathBuf;
 use std::fs::{File, canonicalize};
 use std::io::Write;
-use err::{Error, Result};
+use err::{AssetError, Result};
 use pathdiff::diff_paths;
 use std::borrow::Borrow;
 
@@ -22,7 +21,9 @@ pub fn save<I, E, P>(entities: I, obj_output_path: Option<P>, mtl_output_path: O
     let mut persisted_materials = Vec::new();
 
     if let Some(ref mtl_output_path) = mtl_output_path {
-        let mut mtl = File::create(&mtl_output_path)?;
+        let mut mtl = File::create(&mtl_output_path)
+            .map_err(AssetError::from)?;
+
         // Write header
         mtl.write("# aitios procedurally weathered MTL file\n".as_bytes())?;
         mtl_file = Some(mtl);
@@ -38,16 +39,20 @@ pub fn save<I, E, P>(entities: I, obj_output_path: Option<P>, mtl_output_path: O
         // Make it a relative path
         let mtl_lib = if let Some(ref mtl) = mtl_output_path {
             let mtl = canonicalize(mtl)?;
-            let relative_mtl_path = diff_paths(&mtl, &base);
+            let relative_mtl_path = diff_paths(&mtl, &base)
+                .ok_or_else(|| AssetError::InvalidData(
+                    format!(
+                        "Output path for MTL \"{mtl_path}\" cannot be expressed relative to directory that contains the OBJ \"{obj_path}\".",
+                        mtl_path = mtl_output_path.as_ref().unwrap().to_str().unwrap(),
+                        obj_path = obj_output_path.to_str().unwrap()
+                    )
+                ))?;
 
-            if let Some(relative_mtl_path) = relative_mtl_path {
-                Some(String::from(relative_mtl_path.to_str().expect("Mtl path could not be converted to string")))
-            } else {
-                return Err(Error::Other(format!(
-                    "mtl output path {:?} cannot be expressed relative to parent of OBJ file {:?}",
-                    mtl, base
-                )));
-            }
+            let relative_mtl_path = relative_mtl_path.to_str()
+                .ok_or(AssetError::InvalidData("Mtl path could not be converted to UTF-8 string.".to_string()))?
+                .to_string();
+
+            Some(relative_mtl_path)
         } else {
             None
         };
@@ -240,7 +245,7 @@ mod test {
             Some(obj_path), Some(mtl_path)
         ).unwrap();
 
-        let loaded = load("/tmp/aitios-test-obj-export.obj")
+        let loaded = load(obj_path)
             .unwrap();
 
         assert_eq!(

@@ -8,3 +8,5 @@ aitios-geom = { git = "https://github.com/krachzack/aitios-geom.git" }
 aitios-scene = { git = "https://github.com/krachzack/aitios-scene.git" }
 tobj = "0.1.6"
 pathdiff = "0.1.0"
+failure = "0.1.1"
+failure_derive = "0.1.1"
