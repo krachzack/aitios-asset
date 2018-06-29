@@ -222,9 +222,9 @@ mod test {
         // Different roughness map, will receive entity name suffix
         let cube_roughness = Entity {
             material: Rc::new(MaterialBuilder::from(&*cube.material)
-                // Using current directory as image file, otherwise saving would file since it
+                // Using the OBJ file as pseudo image file, otherwise saving would fail since it
                 // cannot find the map and thus cannot build a relative path
-                .roughness_map(".")
+                .roughness_map("aitios-test-obj-export.obj")
                 .build()),
             ..cube.clone()
         };
@@ -232,7 +232,7 @@ mod test {
         // Different roughness map, will receive entity name suffix
         let cube_normal = Entity {
             material: Rc::new(MaterialBuilder::from(&*cube.material)
-                .normal_map(".")
+                .normal_map("aitios-test-obj-export.obj")
                 .build()),
             ..cube.clone()
         };
