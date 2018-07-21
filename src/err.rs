@@ -1,5 +1,5 @@
-use std::result;
 use std::io;
+use std::result;
 use tobj;
 
 pub type Result<T> = result::Result<T, AssetError>;
@@ -11,7 +11,7 @@ pub enum AssetError {
     #[fail(display = "Asset export encountered IO error")]
     Save(#[cause] io::Error),
     #[fail(display = "Invalid data during asset import/export: ")]
-    InvalidData(String)
+    InvalidData(String),
 }
 
 impl From<tobj::LoadError> for AssetError {

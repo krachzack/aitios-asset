@@ -1,13 +1,13 @@
-use scene::{Entity, Material, MaterialBuilder, DeinterleavedIndexedMeshBuf};
-use tobj;
+use err::{AssetError::*, Result};
+use scene::{DeinterleavedIndexedMeshBuf, Entity, Material, MaterialBuilder};
+use std::iter::repeat;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::iter::repeat;
-use err::{Result, AssetError::*};
+use tobj;
 
 /// Loads the entities stored in the OBJ file at the given path, also loading
 /// associated materials from the MTL file referenced in the OBJ.
-pub fn load<P : Into<PathBuf>>(from : P) -> Result<Vec<Entity>> {
+pub fn load<P: Into<PathBuf>>(from: P) -> Result<Vec<Entity>> {
     let from = from.into();
     let (models, materials) = tobj::load_obj(&from)?;
 
@@ -18,27 +18,27 @@ pub fn load<P : Into<PathBuf>>(from : P) -> Result<Vec<Entity>> {
 }
 
 fn convert_models<I>(models: I, materials: &Vec<Rc<Material>>) -> Vec<Entity>
-    where I : IntoIterator<Item = tobj::Model>
+where
+    I: IntoIterator<Item = tobj::Model>,
 {
     // Default material if object or group does not have a material
-    let no_material = Rc::new(
-        MaterialBuilder::new()
-            .name("NoMaterial")
-            .build()
-    );
+    let no_material = Rc::new(MaterialBuilder::new().name("NoMaterial").build());
 
-    models.into_iter()
+    models
+        .into_iter()
         .map(|m| {
             Entity {
                 name: m.name,
                 // Reference same material for each with same index,
                 // If no index, add a synthetic no_material with default properties.
-                material: m.mesh.material_id
+                material: m
+                    .mesh
+                    .material_id
                     .map(|id| Rc::clone(&materials[id]))
                     .unwrap_or_else(|| Rc::clone(&no_material)),
                 // DeinterleavedIndexedMeshBuf has format compatible to tobj,
                 // just move the vectors and we are done
-                mesh: tobj_mesh_to_aitios_mesh(m.mesh)
+                mesh: tobj_mesh_to_aitios_mesh(m.mesh),
             }
         })
         .collect()
@@ -62,34 +62,39 @@ fn tobj_mesh_to_aitios_mesh(mesh: tobj::Mesh) -> Rc<DeinterleavedIndexedMeshBuf>
 
     if texcoords.len() == 0 {
         // If no texcoords defined, assume them as (0.0, 0.0)
-        let zero_texcoords = repeat(0.0)
-            .take((positions.len() / 3) * 2);
+        let zero_texcoords = repeat(0.0).take((positions.len() / 3) * 2);
 
         texcoords.extend(zero_texcoords);
     }
 
-    Rc::new(
-        DeinterleavedIndexedMeshBuf {
-            positions, normals, texcoords, indices
-        }
-    )
+    Rc::new(DeinterleavedIndexedMeshBuf {
+        positions,
+        normals,
+        texcoords,
+        indices,
+    })
 }
 
 fn convert_materials<I>(materials: I, obj_file: &Path) -> Result<Vec<Rc<Material>>>
-    where I: IntoIterator<Item = tobj::Material>
+where
+    I: IntoIterator<Item = tobj::Material>,
 {
     let obj_parent = obj_file.parent().unwrap_or_else(|| &Path::new("."));
 
-    materials.into_iter()
+    materials
+        .into_iter()
         .map(|m| tobj_to_aitios_mat(m, obj_parent))
         .collect()
 }
 
 fn resolve(path: &str, base: &Path) -> Result<PathBuf> {
-    let mut path : &Path = path.as_ref();
+    let mut path: &Path = path.as_ref();
 
     if path.as_os_str().is_empty() {
-        return Err(InvalidData("OBJ/MTL reference an empty string where a path to an MTL or texture file shold be".to_string()));
+        return Err(InvalidData(
+            "OBJ/MTL reference an empty string where a path to an MTL or texture file shold be"
+                .to_string(),
+        ));
     }
 
     match path.canonicalize() {
@@ -99,9 +104,10 @@ fn resolve(path: &str, base: &Path) -> Result<PathBuf> {
             // Try stripping first path component and interpreting as relative
             // instead of absolute
             if path.is_absolute() {
-                path = path.strip_prefix(
-                    path.iter().next().unwrap() // unwrap safe since is_empty() returned false
-                ).unwrap();
+                path =
+                    path.strip_prefix(
+                        path.iter().next().unwrap(), // unwrap safe since is_empty() returned false
+                    ).unwrap();
             }
 
             let mut relative_to_base = PathBuf::from(base);
@@ -109,17 +115,17 @@ fn resolve(path: &str, base: &Path) -> Result<PathBuf> {
 
             match relative_to_base.canonicalize() {
                 Ok(path) => Ok(path),
-                Err(_) => Err(InvalidData(
-                    format!("OBJ/MTL referenced non-existing file: {:?}", path)
-                ))
+                Err(_) => Err(InvalidData(format!(
+                    "OBJ/MTL referenced non-existing file: {:?}",
+                    path
+                ))),
             }
         }
     }
 }
 
 fn tobj_to_aitios_mat(source_mat: tobj::Material, base_dir: &Path) -> Result<Rc<Material>> {
-    let mut mat = MaterialBuilder::new()
-        .name(source_mat.name);
+    let mut mat = MaterialBuilder::new().name(source_mat.name);
 
     if !source_mat.diffuse_texture.is_empty() {
         mat = mat.diffuse_color_map(resolve(&source_mat.diffuse_texture, base_dir)?);

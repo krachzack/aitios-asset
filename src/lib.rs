@@ -24,10 +24,11 @@
 
 extern crate aitios_geom as geom;
 extern crate aitios_scene as scene;
-extern crate tobj;
-extern crate pathdiff;
 extern crate failure;
-#[macro_use] extern crate failure_derive;
+extern crate pathdiff;
+extern crate tobj;
+#[macro_use]
+extern crate failure_derive;
 
-pub mod obj;
 pub mod err;
+pub mod obj;
